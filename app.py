@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from datetime import date
+from datetime import date, datetime
 
 import pandas as pd
 import streamlit as st
@@ -12,12 +12,15 @@ from db import (
     current_streak,
     get_checks_for_day,
     get_metrics_for_day,
+    get_setting,
     init_db,
     reset_day,
+    set_setting,
     upsert_check,
     upsert_metrics,
 )
 from reset_protocol import PROTOCOL
+from telegram_notifier import send_telegram_message
 
 st.set_page_config(page_title="Daily Reset Dashboard", page_icon=":material/autorenew:", layout="centered")
 
@@ -163,14 +166,131 @@ def render_coach_tab(day: str) -> None:
     st.markdown(advice)
 
 
+def _masked_token(token: str) -> str:
+    if len(token) <= 8:
+        return "*" * len(token)
+    return f"{token[:4]}...{token[-4:]}"
+
+
+def _build_default_reminder_text(day: str) -> str:
+    stats = completion_for_day(day, PROTOCOL)
+    return (
+        f"Daily Reset reminder ({day})\n"
+        f"Current progress: {stats['done']}/{stats['total']} ({stats['pct']:.1f}%).\n"
+        "Open your dashboard and complete your next 3 non-negotiables."
+    )
+
+
+def _is_valid_hhmm(value: str) -> bool:
+    if len(value) != 5 or value[2] != ":":
+        return False
+    left, right = value.split(":")
+    if not (left.isdigit() and right.isdigit()):
+        return False
+    hour = int(left)
+    minute = int(right)
+    return 0 <= hour <= 23 and 0 <= minute <= 59
+
+
+def _maybe_send_scheduled_reminder(day: str) -> None:
+    enabled = get_setting("telegram_enabled", "0") == "1"
+    token = get_setting("telegram_bot_token", "")
+    chat_id = get_setting("telegram_chat_id", "")
+    reminder_time = get_setting("telegram_reminder_time", "20:00")
+    reminder_message = get_setting("telegram_reminder_message", "")
+
+    if not enabled or not token or not chat_id:
+        return
+
+    now = datetime.now()
+    now_hhmm = now.strftime("%H:%M")
+    last_day_sent = get_setting("telegram_last_sent_day", "")
+    if last_day_sent == day:
+        return
+    if now_hhmm < reminder_time:
+        return
+
+    message = reminder_message.strip() or _build_default_reminder_text(day)
+    ok, detail = send_telegram_message(token, chat_id, message)
+    if ok:
+        set_setting("telegram_last_sent_day", day)
+        set_setting("telegram_last_sent_at", now.strftime("%Y-%m-%d %H:%M:%S"))
+        set_setting("telegram_last_error", "")
+    else:
+        set_setting("telegram_last_error", detail)
+
+
+def render_reminders_tab(day: str) -> None:
+    st.subheader("Reminders")
+    st.caption("Configure Telegram notifications for iPhone and Android.")
+
+    enabled_default = get_setting("telegram_enabled", "0") == "1"
+    token_default = get_setting("telegram_bot_token", "")
+    chat_id_default = get_setting("telegram_chat_id", "")
+    time_default_str = get_setting("telegram_reminder_time", "20:00")
+    msg_default = get_setting("telegram_reminder_message", "")
+    last_sent = get_setting("telegram_last_sent_at", "")
+    last_error = get_setting("telegram_last_error", "")
+
+    with st.form("telegram_settings_form"):
+        enabled = st.checkbox("Enable Telegram reminders", value=enabled_default)
+        token = st.text_input("Bot token", value=token_default, type="password", placeholder="123456:ABCDEF...")
+        chat_id = st.text_input("Chat ID", value=chat_id_default, placeholder="e.g. 123456789")
+        reminder_time = st.text_input("Daily reminder time (24h HH:MM)", value=time_default_str, placeholder="20:00")
+        reminder_message = st.text_area(
+            "Reminder message (optional)",
+            value=msg_default,
+            placeholder="Leave blank to use default progress-based reminder.",
+            height=80,
+        )
+        saved = st.form_submit_button("Save Reminder Settings", use_container_width=True)
+
+    if saved:
+        valid_time = _is_valid_hhmm(reminder_time.strip())
+        if not valid_time:
+            st.error("Reminder time must be in HH:MM format (24h), for example 20:00.")
+        else:
+            set_setting("telegram_enabled", "1" if enabled else "0")
+            set_setting("telegram_bot_token", token.strip())
+            set_setting("telegram_chat_id", chat_id.strip())
+            set_setting("telegram_reminder_time", reminder_time.strip())
+            set_setting("telegram_reminder_message", reminder_message.strip())
+            st.success("Telegram reminder settings saved.")
+
+    st.divider()
+    st.markdown("**Current Status**")
+    st.write(f"Enabled: {'Yes' if enabled_default else 'No'}")
+    st.write(f"Bot token: {_masked_token(token_default) if token_default else 'Not set'}")
+    st.write(f"Chat ID: {chat_id_default if chat_id_default else 'Not set'}")
+    st.write(f"Reminder time: {time_default_str}")
+    st.write(f"Last sent: {last_sent if last_sent else 'Never'}")
+    if last_error:
+        st.warning(f"Last send error: {last_error}")
+
+    if st.button("Send Test Telegram Message", use_container_width=True):
+        if not token_default or not chat_id_default:
+            st.error("Set bot token and chat ID first, then save settings.")
+        else:
+            msg = f"Test from Daily Reset Dashboard ({day}). Telegram setup is working."
+            ok, detail = send_telegram_message(token_default, chat_id_default, msg)
+            if ok:
+                set_setting("telegram_last_sent_at", datetime.now().strftime("%Y-%m-%d %H:%M:%S"))
+                set_setting("telegram_last_error", "")
+                st.success("Test message sent.")
+            else:
+                set_setting("telegram_last_error", detail)
+                st.error(f"Failed to send test message: {detail}")
+
+
 def main() -> None:
     init_db()
 
     st.title("Daily Reset Dashboard")
     day = date.today().isoformat()
     st.caption(f"Tracking for {day}")
+    _maybe_send_scheduled_reminder(day)
 
-    tab_today, tab_insights, tab_coach = st.tabs(["Today", "Insights", "Coach"])
+    tab_today, tab_insights, tab_coach, tab_reminders = st.tabs(["Today", "Insights", "Coach", "Reminders"])
 
     with tab_today:
         render_today_tab(day)
@@ -180,6 +300,9 @@ def main() -> None:
 
     with tab_coach:
         render_coach_tab(day)
+
+    with tab_reminders:
+        render_reminders_tab(day)
 
 
 if __name__ == "__main__":

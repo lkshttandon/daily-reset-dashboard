@@ -3,7 +3,7 @@ from __future__ import annotations
 PROTOCOL = {
     "Morning Routine": [
         "7:30 AM: Wake up, drink warm water, open curtains, no phone in bed",
-        "7:45 AM: 5 min stretching, optional black coffee, no nicotine",
+        "7:45 AM: 5 min stretching, optional black coffee, no smoking/vaping",
         "8:30-9:30 AM: Gym (strength + mobility, focus on form)",
         "Post-workout meal: Protein + moderate carbs (eggs, whey + oats, paneer + rice)",
     ],
@@ -17,7 +17,7 @@ PROTOCOL = {
         "Drink 2-3 liters of water",
         "10 min walk after lunch",
         "Deep work in first 90 minutes",
-        "No nicotine after 6-8 PM",
+        "No smoking/vaping after 6-8 PM",
         "Avoid late-night snacking",
     ],
     "Evening Routine": [

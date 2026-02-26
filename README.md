@@ -1,6 +1,6 @@
 # Daily Reset Dashboard
 
-Phone-friendly Streamlit dashboard for daily protocol tracking, insights, and AI coaching.
+Phone-friendly Streamlit dashboard for daily protocol tracking, insights, coaching, and Telegram reminders.
 
 ## Features
 - `Today` tab with grouped checklist sections:
@@ -21,12 +21,14 @@ Phone-friendly Streamlit dashboard for daily protocol tracking, insights, and AI
 - `Coach` tab using local rule-based logic for two goal modes:
   - Fat loss + stable energy
   - Muscle gain + performance
+- `Reminders` tab for Telegram notifications (iPhone + Android via Telegram app)
 
 ## Project Structure
 - `app.py` - Streamlit UI and app flow
 - `reset_protocol.py` - Single editable `PROTOCOL` dictionary
 - `db.py` - SQLite schema + data access helpers
 - `coach_local.py` - local rule-based coach logic
+- `telegram_notifier.py` - Telegram send helper (no external SDK required)
 - `.streamlit/config.toml` - dark theme + minimal toolbar
 - `requirements.txt` - dependencies for local and cloud deploy
 
@@ -51,8 +53,20 @@ Phone-friendly Streamlit dashboard for daily protocol tracking, insights, and AI
 ## Quick Self-Check
 Run a syntax check:
 ```bash
-python -m py_compile app.py db.py coach.py reset_protocol.py
+python -m py_compile app.py db.py coach_local.py reset_protocol.py telegram_notifier.py
 ```
+
+## Telegram Mobile Notifications
+1. In Telegram, create a bot with `@BotFather` and copy the bot token.
+2. Get your personal chat id by messaging `@userinfobot` (or any chat-id bot).
+3. In the app, open `Reminders` tab and set:
+   - Enable Telegram reminders
+   - Bot token
+   - Chat ID
+   - Daily reminder time (`HH:MM`, 24-hour format)
+4. Save settings and use **Send Test Telegram Message**.
+
+Note: Streamlit apps do not run background jobs continuously. Scheduled reminder sends happen when the app is opened/running after the configured time.
 
 ## Deploy to Streamlit Community Cloud
 1. Push this repo to GitHub.
