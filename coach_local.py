@@ -67,15 +67,15 @@ def generate_local_advice(
         fallback = "15-20 min plan: incline treadmill walk 10 min + dumbbell circuit (squat/press/row) 2 rounds."
 
     markdown = (
-        "### \\U0001F957 Food\n"
+        "### 🥗 Food\n"
         f"- {food_options[0]}\n"
         f"- {food_options[1]}\n\n"
-        "### \\U0001F3CB\uFE0F Exercise\n"
+        "### 🏋️ Exercise\n"
         f"{exercise}\n\n"
-        "### \\U0001F527 Improvements\n"
+        "### 🔧 Improvements\n"
         + "\n".join(f"- {item}" for item in improvements)
         + "\n\n"
-        "### \\U0001F691 Fallback Plan\n"
+        "### 🚑 Fallback Plan\n"
         f"{fallback}"
     )
 
